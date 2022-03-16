@@ -1,0 +1,24 @@
+{
+    "os": "Linux-4.15.0-142-generic-x86_64-with-glibc2.17",
+    "python": "3.8.12",
+    "heartbeatAt": "2022-03-16T03:48:10.963643",
+    "startedAt": "2022-03-16T03:48:09.215417",
+    "docker": null,
+    "gpu": "GeForce RTX 2080 Ti",
+    "gpu_count": 1,
+    "cpu_count": 40,
+    "cuda": "10.2.89",
+    "args": [],
+    "state": "running",
+    "program": "single-epoch-resnet-cont.py",
+    "codePath": "simclr_cont_loss_pos_included/single-epoch-resnet-cont.py",
+    "git": {
+        "remote": "git@github.com:likith012/single-epoch.git",
+        "commit": "f9d2c8798f314c2bae7ce50194c549d644833495"
+    },
+    "email": "likith012@gmail.com",
+    "root": "/home2/vivek.talwar/single-epoch",
+    "host": "gnode69",
+    "username": "vivek.talwar",
+    "executable": "/home2/vivek.talwar/miniconda3/envs/torch/bin/python"
+}

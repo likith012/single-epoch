@@ -25,7 +25,7 @@ n_epochs = 200
 NUM_WORKERS = 5
 N_DIM = 256
 EPOCH_LEN = 7
-TEMPERATURE = 1
+TEMPERATURE = 10
 
 ####################################################################################################
 
@@ -133,11 +133,11 @@ test_subjects = list(test_subjects.values())
 
 
 wb = wandb.init(
-        project="WTM-single_epoch",
+        project="single-epoch-contrastive-loss",
         notes="single-epoch, symmetric loss, 1000 samples, using same projection heads and no batch norm, original simclr",
         save_code=True,
         entity="sleep-staging",
-        name="simclr, same_pos_anc",
+        name="single-epoch-contrastive-loss-t-1000, same_pos_anc",
     )
 wb.save('multi-epoch/single_epoch_resnet_cont/*.py')
 wb.watch([q_encoder],log='all',log_freq=500)

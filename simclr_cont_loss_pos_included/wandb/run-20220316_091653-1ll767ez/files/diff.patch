@@ -1,0 +1,1324 @@
+diff --git a/simclr/preprocess_kfold.py b/simclr/preprocess_kfold.py
+index 91cd120..d0f2183 100644
+--- a/simclr/preprocess_kfold.py
++++ b/simclr/preprocess_kfold.py
+@@ -24,7 +24,7 @@ BATCH_SIZE = 1
+ POS_MIN = 1
+ NEG_MIN = 15
+ EPOCH_LEN = 7
+-NUM_SAMPLES = 1000
++NUM_SAMPLES = 100
+ SUBJECTS = np.arange(83)
+ RECORDINGS = [1, 2]
+ 
+diff --git a/simclr/single-epoch-resnet-cont.py b/simclr/single-epoch-resnet-cont.py
+index 63fbc4f..2e60cae 100644
+--- a/simclr/single-epoch-resnet-cont.py
++++ b/simclr/single-epoch-resnet-cont.py
+@@ -25,7 +25,7 @@ n_epochs = 200
+ NUM_WORKERS = 5
+ N_DIM = 256
+ EPOCH_LEN = 7
+-TEMPERATURE = 1
++TEMPERATURE = 1000
+ 
+ ####################################################################################################
+ 
+@@ -133,15 +133,15 @@ test_subjects = list(test_subjects.values())
+ 
+ 
+ wb = wandb.init(
+-        project="WTM-single_epoch",
++        project="single-epoch-contrastive-loss",
+         notes="single-epoch, symmetric loss, 1000 samples, using same projection heads and no batch norm, original simclr",
+         save_code=True,
+         entity="sleep-staging",
+-        name="simclr, same_pos_anc",
++        name="single-epoch-contrastive-loss-t-1000, same_pos_anc",
+     )
+ wb.save('multi-epoch/single_epoch_resnet_cont/*.py')
+ wb.watch([q_encoder],log='all',log_freq=500)
+ 
+ Pretext(q_encoder, optimizer, n_epochs, criterion, pretext_loader, test_subjects, wb, device, SAVE_PATH, BATCH_SIZE)
+ 
+-wb.finish()
+\ No newline at end of file
++wb.finish()
+diff --git a/simclr/single_epoch_resnet_cont/__init__.py b/simclr/single_epoch_resnet_cont/__init__.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/simclr/single_epoch_resnet_cont/augmentations.py b/simclr/single_epoch_resnet_cont/augmentations.py
+deleted file mode 100644
+index 901d14d..0000000
+--- a/simclr/single_epoch_resnet_cont/augmentations.py
++++ /dev/null
+@@ -1,132 +0,0 @@
+-from scipy.interpolate import interp1d
+-from scipy.signal import butter, lfilter
+-import numpy as np
+-
+-def denoise_channel(ts, bandpass, signal_freq):
+-    """
+-    bandpass: (low, high)
+-    """
+-    nyquist_freq = 0.5 * signal_freq
+-    filter_order = 1
+-
+-    low = bandpass[0] / nyquist_freq
+-    high = bandpass[1] / nyquist_freq
+-    b, a = butter(filter_order, [low, high], btype="band")
+-    ts_out = lfilter(b, a, ts)
+-
+-    return np.array(ts_out)
+-
+-
+-def noise_channel(ts, mode, degree):
+-    """
+-    Add noise to ts
+-
+-    mode: high, low, both
+-    degree: degree of noise, compared with range of ts
+-
+-    Input:
+-        ts: (n_length)
+-    Output:
+-        out_ts: (n_length)
+-
+-    """
+-    len_ts = len(ts)
+-    num_range = np.ptp(ts) + 1e-4  # add a small number for flat signal
+-
+-    ### high frequency noise
+-    if mode == "high":
+-        noise = degree * num_range * (2 * np.random.rand(len_ts) - 1)
+-        out_ts = ts + noise
+-
+-    ### low frequency noise
+-    elif mode == "low":
+-        noise = degree * num_range * (2 * np.random.rand(len_ts // 100) - 1)
+-        x_old = np.linspace(0, 1, num=len_ts // 100, endpoint=True)
+-        x_new = np.linspace(0, 1, num=len_ts, endpoint=True)
+-        f = interp1d(x_old, noise, kind="linear")
+-        noise = f(x_new)
+-        out_ts = ts + noise
+-
+-    ### both high frequency noise and low frequency noise
+-    elif mode == "both":
+-        noise1 = degree * num_range * (2 * np.random.rand(len_ts) - 1)
+-        noise2 = degree * num_range * (2 * np.random.rand(len_ts // 100) - 1)
+-        x_old = np.linspace(0, 1, num=len_ts // 100, endpoint=True)
+-        x_new = np.linspace(0, 1, num=len_ts, endpoint=True)
+-        f = interp1d(x_old, noise2, kind="linear")
+-        noise2 = f(x_new)
+-        out_ts = ts + noise1 + noise2
+-
+-    else:
+-        out_ts = ts
+-
+-    return out_ts
+-
+-
+-def add_noise(x, ratio):
+-    """
+-    Add noise to multiple ts
+-    Input:
+-        x: (n_channel, n_length)
+-    Output:
+-        x: (n_channel, n_length)
+-    """
+-    for i in range(x.shape[0]):
+-
+-        mode = np.random.choice(["high", "low", "both", "no"])
+-        x[i, :] = noise_channel(x[i, :], mode=mode, degree=0.05)
+-
+-    return x
+-
+-
+-def remove_noise(x, ratio):
+-    """
+-    Remove noise from multiple ts
+-    Input:
+-        x: (n_channel, n_length)
+-    Output:
+-        x: (n_channel, n_length)
+-
+-    Three bandpass filtering done independently to each channel
+-    sig1 + sig2
+-    sig1
+-    sig2
+-    """
+-    bandpass1 = (1, 5)
+-    bandpass2 = (30, 49)
+-    signal_freq = 100
+-
+-    for i in range(x.shape[0]):
+-        rand = np.random.rand()
+-        if rand > 0.75:
+-            x[i, :] = denoise_channel(
+-                x[i, :], bandpass1, signal_freq
+-            ) + denoise_channel(x[i, :], bandpass2, signal_freq)
+-        elif rand > 0.5:
+-            x[i, :] = denoise_channel(x[i, :], bandpass1, signal_freq)
+-        elif rand > 0.25:
+-            x[i, :] = denoise_channel(x[i, :], bandpass2, signal_freq)
+-        else:
+-            pass
+-    return x
+-
+-
+-def crop(x):
+-    n_length = x.shape[1]
+-    l = np.random.randint(1, n_length - 1)
+-    x[:, :l], x[:, l:] = x[:, -l:], x[:, :-l]
+-
+-    return x
+-
+-
+-def augment(x):
+-    t = np.random.rand()
+-    if t > 0.75:
+-        x = add_noise(x, ratio=0.5)
+-    elif t > 0.5:
+-        x = remove_noise(x, ratio=0.5)
+-    elif t > 0.25:
+-        x = crop(x)
+-    else:
+-        x = x[[1, 0], :]  # channel flipping
+-    return x
+\ No newline at end of file
+diff --git a/simclr/single_epoch_resnet_cont/augmentations_mul.py b/simclr/single_epoch_resnet_cont/augmentations_mul.py
+deleted file mode 100644
+index 901d14d..0000000
+--- a/simclr/single_epoch_resnet_cont/augmentations_mul.py
++++ /dev/null
+@@ -1,132 +0,0 @@
+-from scipy.interpolate import interp1d
+-from scipy.signal import butter, lfilter
+-import numpy as np
+-
+-def denoise_channel(ts, bandpass, signal_freq):
+-    """
+-    bandpass: (low, high)
+-    """
+-    nyquist_freq = 0.5 * signal_freq
+-    filter_order = 1
+-
+-    low = bandpass[0] / nyquist_freq
+-    high = bandpass[1] / nyquist_freq
+-    b, a = butter(filter_order, [low, high], btype="band")
+-    ts_out = lfilter(b, a, ts)
+-
+-    return np.array(ts_out)
+-
+-
+-def noise_channel(ts, mode, degree):
+-    """
+-    Add noise to ts
+-
+-    mode: high, low, both
+-    degree: degree of noise, compared with range of ts
+-
+-    Input:
+-        ts: (n_length)
+-    Output:
+-        out_ts: (n_length)
+-
+-    """
+-    len_ts = len(ts)
+-    num_range = np.ptp(ts) + 1e-4  # add a small number for flat signal
+-
+-    ### high frequency noise
+-    if mode == "high":
+-        noise = degree * num_range * (2 * np.random.rand(len_ts) - 1)
+-        out_ts = ts + noise
+-
+-    ### low frequency noise
+-    elif mode == "low":
+-        noise = degree * num_range * (2 * np.random.rand(len_ts // 100) - 1)
+-        x_old = np.linspace(0, 1, num=len_ts // 100, endpoint=True)
+-        x_new = np.linspace(0, 1, num=len_ts, endpoint=True)
+-        f = interp1d(x_old, noise, kind="linear")
+-        noise = f(x_new)
+-        out_ts = ts + noise
+-
+-    ### both high frequency noise and low frequency noise
+-    elif mode == "both":
+-        noise1 = degree * num_range * (2 * np.random.rand(len_ts) - 1)
+-        noise2 = degree * num_range * (2 * np.random.rand(len_ts // 100) - 1)
+-        x_old = np.linspace(0, 1, num=len_ts // 100, endpoint=True)
+-        x_new = np.linspace(0, 1, num=len_ts, endpoint=True)
+-        f = interp1d(x_old, noise2, kind="linear")
+-        noise2 = f(x_new)
+-        out_ts = ts + noise1 + noise2
+-
+-    else:
+-        out_ts = ts
+-
+-    return out_ts
+-
+-
+-def add_noise(x, ratio):
+-    """
+-    Add noise to multiple ts
+-    Input:
+-        x: (n_channel, n_length)
+-    Output:
+-        x: (n_channel, n_length)
+-    """
+-    for i in range(x.shape[0]):
+-
+-        mode = np.random.choice(["high", "low", "both", "no"])
+-        x[i, :] = noise_channel(x[i, :], mode=mode, degree=0.05)
+-
+-    return x
+-
+-
+-def remove_noise(x, ratio):
+-    """
+-    Remove noise from multiple ts
+-    Input:
+-        x: (n_channel, n_length)
+-    Output:
+-        x: (n_channel, n_length)
+-
+-    Three bandpass filtering done independently to each channel
+-    sig1 + sig2
+-    sig1
+-    sig2
+-    """
+-    bandpass1 = (1, 5)
+-    bandpass2 = (30, 49)
+-    signal_freq = 100
+-
+-    for i in range(x.shape[0]):
+-        rand = np.random.rand()
+-        if rand > 0.75:
+-            x[i, :] = denoise_channel(
+-                x[i, :], bandpass1, signal_freq
+-            ) + denoise_channel(x[i, :], bandpass2, signal_freq)
+-        elif rand > 0.5:
+-            x[i, :] = denoise_channel(x[i, :], bandpass1, signal_freq)
+-        elif rand > 0.25:
+-            x[i, :] = denoise_channel(x[i, :], bandpass2, signal_freq)
+-        else:
+-            pass
+-    return x
+-
+-
+-def crop(x):
+-    n_length = x.shape[1]
+-    l = np.random.randint(1, n_length - 1)
+-    x[:, :l], x[:, l:] = x[:, -l:], x[:, :-l]
+-
+-    return x
+-
+-
+-def augment(x):
+-    t = np.random.rand()
+-    if t > 0.75:
+-        x = add_noise(x, ratio=0.5)
+-    elif t > 0.5:
+-        x = remove_noise(x, ratio=0.5)
+-    elif t > 0.25:
+-        x = crop(x)
+-    else:
+-        x = x[[1, 0], :]  # channel flipping
+-    return x
+\ No newline at end of file
+diff --git a/simclr/single_epoch_resnet_cont/loss.py b/simclr/single_epoch_resnet_cont/loss.py
+deleted file mode 100644
+index e2224fb..0000000
+--- a/simclr/single_epoch_resnet_cont/loss.py
++++ /dev/null
+@@ -1,27 +0,0 @@
+-import torch
+-import torch.nn.functional as F
+-
+-# Loss function
+-class loss_fn(torch.nn.modules.loss._Loss):
+-    def __init__(self, device, T=1.0):
+-        """
+-        T: softmax temperature (default: 0.07)
+-        """
+-        super(loss_fn, self).__init__()
+-        self.T = T
+-        self.device = device
+-
+-    def forward(self, anc, pos, neg):
+-
+-        # L2 normalize
+-        anc = F.normalize(anc, p=2, dim=1)  # B, 128
+-        pos = F.normalize(pos, p=2, dim=1)  # B, 128
+-        neg = F.normalize(neg, p=2, dim=1)  # B, 128
+-
+-        pos_numerator = torch.exp((anc*pos).sum(axis=-1)/self.T) # B
+-        pos_numerator = torch.cat([pos_numerator,pos_numerator],dim=0)
+-        neg = neg.permute(1,0) # 128, B
+-        neg1_denominator = torch.exp((torch.mm(torch.cat([anc,pos],dim=0), neg).sum(axis=-1))/self.T) # B
+-       
+-        loss = -torch.log(pos_numerator/(pos_numerator+neg1_denominator))
+-        return loss.mean()
+\ No newline at end of file
+diff --git a/simclr/single_epoch_resnet_cont/model.py b/simclr/single_epoch_resnet_cont/model.py
+deleted file mode 100644
+index 8781e77..0000000
+--- a/simclr/single_epoch_resnet_cont/model.py
++++ /dev/null
+@@ -1,63 +0,0 @@
+-from torch import nn
+-from resnet1d import BaseNet
+-import torch
+-
+-def sleep_model(n_channels, input_size_samples, n_dim = 256):
+-    class attention(nn.Module):
+-        
+-        def __init__(self, n_dim):
+-            super(attention,self).__init__()
+-            self.att_dim = n_dim
+-            self.W = nn.Parameter(torch.randn(n_dim, self.att_dim))
+-            self.V = nn.Parameter(torch.randn(self.att_dim, 1))
+-            self.scale = self.att_dim**-0.5
+-            
+-        def forward(self,x):
+-            x = x.permute(0, 2, 1)
+-            e = torch.matmul(x, self.W)
+-            e = torch.matmul(torch.tanh(e), self.V)
+-            e = e*self.scale
+-            n1 = torch.exp(e)
+-            n2 = torch.sum(torch.exp(e), 1, keepdim=True)
+-            alpha = torch.div(n1, n2)
+-            x = torch.sum(torch.mul(alpha, x), 1)
+-            return x
+-        
+-    class encoder(nn.Module):
+-
+-        def __init__(self, n_channels, n_dim):
+-            super(encoder,self).__init__()
+-            self.model = BaseNet(input_channel = n_channels)
+-            self.attention = attention(n_dim)
+-            
+-        def forward(self, x): 
+-            x = self.model(x)
+-            x = self.attention(x)
+-            return x
+-        
+-    class Net(nn.Module):
+-        
+-        def __init__(self, n_channels, n_dim):
+-            super().__init__()
+-            self.enc = encoder(n_channels, n_dim)
+-            self.n_dim = n_dim
+-            
+-            self.p1 = nn.Sequential(
+-                nn.Linear(self.n_dim, self.n_dim // 2, bias=True),
+-                # nn.BatchNorm1d(self.n_dim // 2),
+-                nn.ReLU(inplace=True),
+-                nn.Linear(self.n_dim // 2, self.n_dim // 2, bias=True),
+-            )
+-           
+-        def forward(self, x, proj='mid'):
+-            x = self.enc(x)
+-            
+-            if proj == 'top':
+-                x = self.p1(x)
+-                return x
+-            elif proj == 'mid':
+-                return x
+-            else:
+-                raise Exception("Fix the projection heads")
+-            
+-    return Net(n_channels, n_dim)
+\ No newline at end of file
+diff --git a/simclr/single_epoch_resnet_cont/preprocess_kfold.py b/simclr/single_epoch_resnet_cont/preprocess_kfold.py
+deleted file mode 100644
+index 91cd120..0000000
+--- a/simclr/single_epoch_resnet_cont/preprocess_kfold.py
++++ /dev/null
+@@ -1,381 +0,0 @@
+-import os
+-import numpy as np
+-import pandas as pd
+-from tqdm import tqdm
+-
+-import mne, os
+-from mne.datasets.sleep_physionet.age import fetch_data
+-
+-from braindecode.datautil.preprocess import preprocess, Preprocessor
+-from braindecode.datautil.windowers import create_windows_from_events
+-from braindecode.datautil.preprocess import zscore
+-from braindecode.datasets import BaseConcatDataset, BaseDataset
+-
+-from torch.utils.data import DataLoader
+-from torch.utils.data.sampler import Sampler
+-from sklearn.utils import check_random_state
+-
+-PATH = '/scratch/sleepkfold/'
+-DATA_PATH = '/scratch/'
+-os.makedirs(PATH, exist_ok=True)
+-
+-# Params
+-BATCH_SIZE = 1
+-POS_MIN = 1
+-NEG_MIN = 15
+-EPOCH_LEN = 7
+-NUM_SAMPLES = 1000
+-SUBJECTS = np.arange(83)
+-RECORDINGS = [1, 2]
+-
+-
+-##################################################################################################
+-
+-random_state = 1234
+-n_jobs = 1
+-sfreq = 100
+-high_cut_hz = 30
+-
+-window_size_s = 30
+-sfreq = 100
+-window_size_samples = window_size_s * sfreq
+-
+-
+-
+-class SleepPhysionet(BaseConcatDataset):
+-    def __init__(
+-        self,
+-        subject_ids=None,
+-        recording_ids=None,
+-        preload=False,
+-        load_eeg_only=True,
+-        crop_wake_mins=30,
+-        crop=None,
+-    ):
+-        if subject_ids is None:
+-            subject_ids = range(83)
+-        if recording_ids is None:
+-            recording_ids = [1, 2]
+-
+-        paths = fetch_data(
+-            subject_ids,
+-            recording=recording_ids,
+-            on_missing="warn",
+-            path= DATA_PATH,
+-        )
+-
+-        all_base_ds = list()
+-        for p in paths:
+-            raw, desc = self._load_raw(
+-                p[0],
+-                p[1],
+-                preload=preload,
+-                load_eeg_only=load_eeg_only,
+-                crop_wake_mins=crop_wake_mins,
+-                crop=crop
+-            )
+-            base_ds = BaseDataset(raw, desc)
+-            all_base_ds.append(base_ds)
+-        super().__init__(all_base_ds)
+-
+-    @staticmethod
+-    def _load_raw(
+-        raw_fname,
+-        ann_fname,
+-        preload,
+-        load_eeg_only=True,
+-        crop_wake_mins=False,
+-        crop=None,
+-    ):
+-        ch_mapping = {
+-            "EOG horizontal": "eog",
+-            "Resp oro-nasal": "misc",
+-            "EMG submental": "misc",
+-            "Temp rectal": "misc",
+-            "Event marker": "misc",
+-        }
+-        exclude = list(ch_mapping.keys()) if load_eeg_only else ()
+-
+-        raw = mne.io.read_raw_edf(raw_fname, preload=preload, exclude=exclude)
+-        annots = mne.read_annotations(ann_fname)
+-        raw.set_annotations(annots, emit_warning=False)
+-
+-        if crop_wake_mins > 0:
+-            # Find first and last sleep stages
+-            mask = [x[-1] in ["1", "2", "3", "4", "R"] for x in annots.description]
+-            sleep_event_inds = np.where(mask)[0]
+-
+-            # Crop raw
+-            tmin = annots[int(sleep_event_inds[0])]["onset"] - crop_wake_mins * 60
+-            tmax = annots[int(sleep_event_inds[-1])]["onset"] + crop_wake_mins * 60
+-            raw.crop(tmin=max(tmin, raw.times[0]), tmax=min(tmax, raw.times[-1]))
+-
+-        # Rename EEG channels
+-        ch_names = {i: i.replace("EEG ", "") for i in raw.ch_names if "EEG" in i}
+-        raw.rename_channels(ch_names)
+-
+-        if not load_eeg_only:
+-            raw.set_channel_types(ch_mapping)
+-
+-        if crop is not None:
+-            raw.crop(*crop)
+-
+-        basename = os.path.basename(raw_fname)
+-        subj_nb = int(basename[3:5])
+-        sess_nb = int(basename[5])
+-        desc = pd.Series({"subject": subj_nb, "recording": sess_nb}, name="")
+-
+-        return raw, desc
+-
+-
+-dataset = SleepPhysionet(
+-    subject_ids=SUBJECTS, recording_ids=RECORDINGS, crop_wake_mins=30
+-)
+-
+-
+-preprocessors = [
+-    Preprocessor(lambda x: x * 1e6),
+-    Preprocessor("filter", l_freq=None, h_freq=high_cut_hz, n_jobs=n_jobs),
+-]
+-
+-# Transform the data
+-preprocess(dataset, preprocessors)
+-
+-
+-mapping = {  # We merge stages 3 and 4 following AASM standards.
+-    "Sleep stage W": 0,
+-    "Sleep stage 1": 1,
+-    "Sleep stage 2": 2,
+-    "Sleep stage 3": 3,
+-    "Sleep stage 4": 3,
+-    "Sleep stage R": 4,
+-}
+-
+-windows_dataset = create_windows_from_events(
+-    dataset,
+-    trial_start_offset_samples=0,
+-    trial_stop_offset_samples=0,
+-    window_size_samples=window_size_samples,
+-    window_stride_samples=window_size_samples,
+-    preload= True,
+-    mapping=mapping,
+-)
+-
+-
+-preprocess(windows_dataset, [Preprocessor(zscore)])
+-
+-
+-###################################################################################################################################
+-""" Subject sampling """
+-
+-rng = np.random.RandomState(1234)
+-
+-NUM_WORKERS = 0 if n_jobs <= 1 else n_jobs
+-PERSIST = False if NUM_WORKERS <= 1 else True
+-
+-
+-subjects = np.unique(windows_dataset.description["subject"])
+-sub_pretext = rng.choice(subjects, 58, replace=False)
+-sub_test = sorted(list(set(subjects) - set(sub_pretext)))
+-
+-
+-print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+-print(f"Pretext: {sub_pretext} \n")
+-print(f"Test: {sub_test} \n")
+-print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+-
+-
+-#######################################################################################################################################
+-
+-
+-class RelativePositioningDataset(BaseConcatDataset):
+-    """BaseConcatDataset with __getitem__ that expects 2 indices and a target."""
+-
+-    def __init__(self, list_of_ds, epoch_len=7):
+-        super().__init__(list_of_ds)
+-        self.return_pair = True
+-        self.epoch_len = epoch_len
+-
+-    def __getitem__(self, index):
+-
+-        pos, neg = index
+-        pos_data = []
+-        neg_data = []
+-
+-        assert pos != neg, "pos and neg should not be the same"
+-
+-        for i in range(-(self.epoch_len // 2), self.epoch_len // 2 + 1):
+-            pos_data.append(super().__getitem__(pos + i)[0])
+-            neg_data.append(super().__getitem__(neg + i)[0])
+-
+-        pos_data = np.stack(pos_data, axis=0) # (7, 2, 3000)
+-        neg_data = np.stack(neg_data, axis=0) # (7, 2, 3000)
+-
+-        return pos_data, neg_data
+-
+-
+-class TuneDataset(BaseConcatDataset):
+-    """BaseConcatDataset for train and test"""
+-
+-    def __init__(self, list_of_ds):
+-        super().__init__(list_of_ds)
+-
+-    def __getitem__(self, index):
+-
+-        X = super().__getitem__(index)[0]
+-        y = super().__getitem__(index)[1]
+-
+-        return X, y
+-
+-
+-class RecordingSampler(Sampler):
+-    def __init__(self, metadata, random_state=None, epoch_len=7):
+-
+-        self.metadata = metadata
+-        self._init_info()
+-        self.rng = check_random_state(random_state)
+-        self.epoch_len = epoch_len
+-
+-    def _init_info(self):
+-        keys = ["subject", "recording"]
+-
+-        self.metadata = self.metadata.reset_index().rename(
+-            columns={"index": "window_index"}
+-        )
+-        self.info = (
+-            self.metadata.reset_index()
+-            .groupby(keys)[["index", "i_start_in_trial"]]
+-            .agg(["unique"])
+-        )
+-        self.info.columns = self.info.columns.get_level_values(0)
+-
+-    def sample_recording(self):
+-        """Return a random recording index."""
+-        return self.rng.choice(self.n_recordings)
+-
+-    def sample_window(self, rec_ind=None):
+-        """Return a specific window."""
+-        if rec_ind is None:
+-            rec_ind = self.sample_recording()
+-        win_ind = self.rng.choice(
+-            self.info.iloc[rec_ind]["index"][self.epoch_len // 2 : -self.epoch_len // 2]
+-        )
+-        return win_ind, rec_ind
+-
+-    def __iter__(self):
+-        raise NotImplementedError
+-
+-    @property
+-    def n_recordings(self):
+-        return self.info.shape[0]
+-
+-
+-class RelativePositioningSampler(RecordingSampler):
+-    def __init__(
+-        self,
+-        metadata,
+-        tau_pos,
+-        tau_neg,
+-        n_examples,
+-        same_rec_neg=True,
+-        random_state=None,
+-        epoch_len=7,
+-    ):
+-        super().__init__(metadata, random_state=random_state, epoch_len=epoch_len)
+-
+-        self.tau_pos = tau_pos
+-        self.tau_neg = tau_neg
+-        self.epoch_len = epoch_len
+-        self.n_examples = n_examples
+-        self.same_rec_neg = same_rec_neg
+-
+-    def _sample_pair(self):
+-        
+-        """Sample a pair of two windows."""
+-        # Sample first window
+-        win_ind1, rec_ind1 = self.sample_window()
+-        
+-        ts1 = self.metadata.iloc[win_ind1]["i_start_in_trial"]
+-        ts = self.info.iloc[rec_ind1]["i_start_in_trial"]
+-
+-        epoch_min = self.info.iloc[rec_ind1]["i_start_in_trial"][self.epoch_len // 2]
+-        epoch_max = self.info.iloc[rec_ind1]["i_start_in_trial"][-self.epoch_len // 2]
+-
+-        if self.same_rec_neg:
+-            mask = ((ts <= ts1 - self.tau_neg) & (ts >= epoch_min)) | (
+-                (ts >= ts1 + self.tau_neg) & (ts <= epoch_max)
+-            )
+-
+-        if sum(mask) == 0:
+-            raise NotImplementedError
+-        win_ind2 = self.rng.choice(self.info.iloc[rec_ind1]["index"][mask])
+-        
+-        return win_ind1, win_ind2
+-
+-    def __iter__(self):
+-
+-        for i in range(self.n_examples):
+-
+-            yield self._sample_pair()
+-
+-    def __len__(self):
+-        return self.n_examples
+-    
+-    
+-######################################################################################################################
+-
+-
+-PRETEXT_PATH = os.path.join(PATH, "pretext")
+-TEST_PATH = os.path.join(PATH, "test")
+-
+-if not os.path.exists(PRETEXT_PATH): os.mkdir(PRETEXT_PATH)
+-if not os.path.exists(TEST_PATH): os.mkdir(TEST_PATH)
+-
+-
+-splitted = dict()
+-
+-splitted["pretext"] = RelativePositioningDataset(
+-    [ds for ds in windows_dataset.datasets if ds.description["subject"] in sub_pretext],
+-    epoch_len = EPOCH_LEN
+-)
+-
+-
+-splitted["test"] = [ds for ds in windows_dataset.datasets if ds.description["subject"] in sub_test]
+-
+-for sub in splitted["test"]:
+-    temp_path = os.path.join(TEST_PATH, str(sub.description["subject"]) + str(sub.description["recording"])+'.npz')
+-    np.savez(temp_path, **sub.__dict__)
+-
+-########################################################################################################################
+-
+-
+-# Sampler
+-tau_pos, tau_neg = int(sfreq * POS_MIN * 60), int(sfreq * NEG_MIN * 60)
+-n_examples_pretext = NUM_SAMPLES * len(splitted["pretext"].datasets)
+-
+-print(f'Number of pretext subjects: {len(splitted["pretext"].datasets)}')
+-print(f'Number of pretext epochs: {n_examples_pretext}')
+-
+-pretext_sampler = RelativePositioningSampler(
+-    splitted["pretext"].get_metadata(),
+-    tau_pos=tau_pos,
+-    tau_neg=tau_neg,
+-    n_examples=n_examples_pretext,
+-    same_rec_neg=True,
+-    random_state=random_state  # Same samples for every iteration of dataloader
+-)
+-
+-
+-# Dataloader
+-pretext_loader = DataLoader(
+-    splitted["pretext"],
+-    batch_size=BATCH_SIZE,
+-    sampler=pretext_sampler
+-)
+-
+-
+-for i, arr in tqdm(enumerate(pretext_loader), desc = 'pretext'):
+-    temp_path = os.path.join(PRETEXT_PATH, str(i) + '.npz')
+-    np.savez(temp_path, pos = arr[0].numpy().squeeze(0), neg = arr[1].numpy().squeeze(0))
+-  
+-
+diff --git a/simclr/single_epoch_resnet_cont/resnet1d.py b/simclr/single_epoch_resnet_cont/resnet1d.py
+deleted file mode 100644
+index c79715e..0000000
+--- a/simclr/single_epoch_resnet_cont/resnet1d.py
++++ /dev/null
+@@ -1,102 +0,0 @@
+-#%%
+-import torch.nn as nn
+-import torch
+-
+-
+-# Convolution Function
+-def conv3x3(in_planes, out_planes, stride=1):
+-    """3x3 convolution with padding"""
+-    return nn.Conv1d(in_planes, out_planes, kernel_size=7, stride=stride,
+-                     padding=3, bias=False)
+-
+-#Basic Building Block
+-class BasicBlock_Bottle(nn.Module):
+-    expansion = 4
+-
+-    def __init__(self, inplanes3, planes, stride=1, downsample=None):
+-        super(BasicBlock_Bottle, self).__init__()
+-        self.conv1 = nn.Conv1d(inplanes3,planes,kernel_size=1,bias=False) 
+-        self.bn1 = nn.BatchNorm1d(planes)
+-        self.relu = nn.ReLU(inplace=True)
+-        self.drop = nn.Dropout(p=0.2)
+-        self.conv2 = nn.Conv1d(planes,planes,kernel_size=25,stride=stride,padding=12,bias=False) 
+-        self.bn2 = nn.BatchNorm1d(planes)
+-        self.downsample = downsample
+-        self.stride = stride
+-        self.conv3 = nn.Conv1d(planes, self.expansion *planes,kernel_size=1,bias=False)  #
+-        self.bn3 = nn.BatchNorm1d(self.expansion *planes)
+-        
+-
+-    def forward(self, x):
+-        residual = x
+-
+-        out = self.conv1(x)
+-        out = self.bn1(out)
+-        out = self.relu(out)
+-        out = self.drop(out)
+-
+-        out = self.conv2(out)
+-        out = self.bn2(out)
+-        out = self.relu(out)
+-        out = self.conv3(out)
+-        out = self.bn3(out)
+-
+-        if self.downsample is not None:
+-            residual = self.downsample(x)
+-
+-        out += residual
+-        out = self.relu(out)
+-
+-        return out
+-
+-#Main 1D-RESNET Model
+-class BaseNet(nn.Module):
+-    def __init__(self, input_channel=2, layers=[3, 4, 6, 3]):
+-        self.inplanes3 = 16
+-
+-        super(BaseNet, self).__init__()
+-        
+-
+-        self.conv1 = nn.Conv1d(input_channel, 16, kernel_size=71, stride=2, padding=35,
+-                               bias=False)
+-        self.bn1 = nn.BatchNorm1d(16)
+-        self.relu = nn.ReLU(inplace=True)
+-        self.maxpool = nn.MaxPool1d(kernel_size=71, stride=2, padding=35)
+-
+-        self.layer3x3_1 = self._make_layer3(BasicBlock_Bottle, 8, layers[0], stride=1)
+-        self.layer3x3_2 = self._make_layer3(BasicBlock_Bottle, 16, layers[1], stride=2)
+-        self.layer3x3_3 = self._make_layer3(BasicBlock_Bottle, 32, layers[2], stride=2)
+-        self.layer3x3_4 = self._make_layer3(BasicBlock_Bottle, 64, layers[3], stride=2)
+-
+-
+-    def _make_layer3(self, block, planes, blocks, stride=2):
+-        downsample = None
+-        if stride != 1 or self.inplanes3 != planes * block.expansion:
+-            downsample = nn.Sequential(
+-                nn.Conv1d(self.inplanes3, planes * block.expansion,
+-                          kernel_size=1, stride=stride, bias=False),
+-                nn.BatchNorm1d(planes * block.expansion),
+-            )
+-
+-        layers = []
+-        layers.append(block(self.inplanes3, planes, stride, downsample))
+-        self.inplanes3 = planes * block.expansion
+-        for i in range(1, blocks):
+-            layers.append(block(self.inplanes3, planes))
+-
+-        return nn.Sequential(*layers)
+-
+-   
+-
+-    def forward(self, x0):
+-        x0 = self.conv1(x0)
+-        x0 = self.bn1(x0)
+-        x0 = self.relu(x0)
+-        x0 = self.maxpool(x0)
+-
+-        x = self.layer3x3_1(x0)
+-        x = self.layer3x3_2(x)
+-        x = self.layer3x3_3(x)
+-        x = self.layer3x3_4(x)
+-        
+-        return  x
+diff --git a/simclr/single_epoch_resnet_cont/single-epoch-resnet-cont.py b/simclr/single_epoch_resnet_cont/single-epoch-resnet-cont.py
+deleted file mode 100644
+index 63fbc4f..0000000
+--- a/simclr/single_epoch_resnet_cont/single-epoch-resnet-cont.py
++++ /dev/null
+@@ -1,147 +0,0 @@
+-from augmentations import *
+-from loss import loss_fn
+-from model import sleep_model
+-from train import *
+-from utils import *
+-
+-from braindecode.util import set_random_seeds
+-
+-import os
+-import numpy as np
+-import copy
+-import wandb
+-import torch
+-from torch.utils.data import DataLoader, Dataset
+-
+-
+-PATH = '/scratch/sleepkfold'
+-
+-# Params
+-SAVE_PATH = "single-epoch-resnet-cont-loss.pth"
+-WEIGHT_DECAY = 1e-4
+-BATCH_SIZE = 128
+-lr = 5e-4
+-n_epochs = 200
+-NUM_WORKERS = 5
+-N_DIM = 256
+-EPOCH_LEN = 7
+-TEMPERATURE = 1
+-
+-####################################################################################################
+-
+-random_state = 1234
+-sfreq = 100
+-
+-# Seeds
+-rng = np.random.RandomState(random_state)
+-device = "cuda" if torch.cuda.is_available() else "cpu"
+-if device == "cuda":
+-    torch.backends.cudnn.deterministic = True 
+-    torch.backends.cudnn.benchmark = False
+-    print(f"GPU available: {torch.cuda.device_count()}")
+-
+-set_random_seeds(seed=random_state, cuda=device == "cuda")
+-
+-
+-##################################################################################################
+-
+-
+-# Extract number of channels and time steps from dataset
+-n_channels, input_size_samples = (2, 3000)
+-model = sleep_model(n_channels, input_size_samples, n_dim = N_DIM)
+-
+-q_encoder = model.to(device)
+-
+-optimizer = torch.optim.Adam(q_encoder.parameters(), lr=lr, weight_decay=WEIGHT_DECAY)
+-criterion = loss_fn(device,T=TEMPERATURE).to(device)
+-
+-#####################################################################################################
+-
+-
+-class pretext_data(Dataset):
+-
+-    def __init__(self, filepath):
+-        
+-        self.file_path = filepath
+-        self.idx = np.array(range(len(self.file_path)))
+-
+-    def __len__(self):
+-        return len(self.file_path)
+-
+-    def __getitem__(self, index):
+-        
+-        path = self.file_path[index]
+-        data = np.load(path)
+-        pos = data['pos'] #(7, 2, 3000)
+-        pos_len = len(pos) # 7
+-        pos = pos[pos_len // 2] # (2, 3000)
+-        neg = data['neg'][pos_len // 2] # (2, 3000)
+-        anc = copy.deepcopy(pos)
+-        
+-        # augment
+-        pos = augment(pos)
+-        anc = augment(anc)
+-        neg = augment(neg)
+-       
+-        return anc, pos, neg
+-    
+-class train_data(Dataset):
+-
+-    def __init__(self, filepath):
+-        
+-        self.file_path = filepath
+-        self.idx = np.array(range(len(self.file_path)))
+-
+-    def __len__(self):
+-        return len(self.file_path)
+-
+-    def __getitem__(self, index):
+-        
+-        path = self.file_path[index]
+-        data = np.load(path)
+-        
+-        return data['x'], data['y']
+-    
+-    
+-
+-PRETEXT_FILE = os.listdir(os.path.join(PATH, "pretext"))
+-PRETEXT_FILE.sort(key=natural_keys)
+-PRETEXT_FILE = [os.path.join(PATH, "pretext", f) for f in PRETEXT_FILE]
+-
+-TEST_FILE = os.listdir(os.path.join(PATH, "test"))
+-TEST_FILE.sort(key=natural_keys)
+-TEST_FILE = [os.path.join(PATH, "test", f) for f in TEST_FILE]
+-
+-print(f'Number of pretext files: {len(PRETEXT_FILE)}')
+-print(f'Number of test records: {len(TEST_FILE)}')
+-
+-pretext_loader = DataLoader(pretext_data(PRETEXT_FILE), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+-
+-test_records = [np.load(f) for f in TEST_FILE]
+-test_subjects = dict()
+-
+-for i, rec in enumerate(test_records):
+-    if rec['_description'][0] not in test_subjects.keys():
+-        test_subjects[rec['_description'][0]] = [rec]
+-    else:
+-        test_subjects[rec['_description'][0]].append(rec)
+-
+-test_subjects = list(test_subjects.values())
+-
+-
+-##############################################################################################################################
+-
+-
+-wb = wandb.init(
+-        project="WTM-single_epoch",
+-        notes="single-epoch, symmetric loss, 1000 samples, using same projection heads and no batch norm, original simclr",
+-        save_code=True,
+-        entity="sleep-staging",
+-        name="simclr, same_pos_anc",
+-    )
+-wb.save('multi-epoch/single_epoch_resnet_cont/*.py')
+-wb.watch([q_encoder],log='all',log_freq=500)
+-
+-Pretext(q_encoder, optimizer, n_epochs, criterion, pretext_loader, test_subjects, wb, device, SAVE_PATH, BATCH_SIZE)
+-
+-wb.finish()
+\ No newline at end of file
+diff --git a/simclr/single_epoch_resnet_cont/train.py b/simclr/single_epoch_resnet_cont/train.py
+deleted file mode 100644
+index 8642d20..0000000
+--- a/simclr/single_epoch_resnet_cont/train.py
++++ /dev/null
+@@ -1,219 +0,0 @@
+-from sklearn.metrics import (
+-    cohen_kappa_score,
+-    accuracy_score,
+-    f1_score,
+-    confusion_matrix,
+-    balanced_accuracy_score
+-)
+-import torch
+-from sklearn.linear_model import LogisticRegression
+-from sklearn.preprocessing import StandardScaler
+-from sklearn.model_selection import KFold
+-from tqdm import tqdm
+-import numpy as np
+-from torch.utils.data import DataLoader, Dataset
+-
+-
+-
+-# Train, test
+-def evaluate(q_encoder, train_loader, test_loader, device):
+-
+-    # eval
+-    q_encoder.eval()
+-
+-    # process val
+-    emb_val, gt_val = [], []
+-
+-    with torch.no_grad():
+-        for (X_val, y_val) in train_loader:
+-            X_val = X_val.float()
+-            y_val = y_val.long()
+-            X_val = X_val.to(device)
+-            emb_val.extend(q_encoder(X_val, proj='mid').cpu().tolist())
+-            gt_val.extend(y_val.numpy().flatten())
+-    emb_val, gt_val = np.array(emb_val), np.array(gt_val)
+-
+-    emb_test, gt_test = [], []
+-
+-    with torch.no_grad():
+-        for (X_test, y_test) in test_loader:
+-            X_test = X_test.float()
+-            y_test = y_test.long()
+-            X_test = X_test.to(device)
+-            emb_test.extend(q_encoder(X_test, proj='mid').cpu().tolist())
+-            gt_test.extend(y_test.numpy().flatten())
+-
+-    emb_test, gt_test = np.array(emb_test), np.array(gt_test)
+-
+-    acc, cm, f1, kappa, bal_acc, gt, pd = task(emb_val, emb_test, gt_val, gt_test)
+-
+-    q_encoder.train()
+-    return acc, cm, f1, kappa, bal_acc, gt, pd
+-
+-
+-def task(X_train, X_test, y_train, y_test):
+-    
+-    scaler = StandardScaler()
+-    X_train = scaler.fit_transform(X_train)
+-    X_test = scaler.transform(X_test)
+-
+-    cls = LogisticRegression(penalty='l2', C=1.0, solver="saga", class_weight='balanced', multi_class="multinomial", max_iter= 3000, n_jobs=-1, dual = False, random_state=1234)
+-    cls.fit(X_train, y_train)
+-    pred = cls.predict(X_test)
+-
+-    acc = accuracy_score(y_test, pred)
+-    cm = confusion_matrix(y_test, pred)
+-    f1 = f1_score(y_test, pred, average="macro")
+-    kappa = cohen_kappa_score(y_test, pred)
+-    bal_acc = balanced_accuracy_score(y_test, pred)
+-
+-    return acc, cm, f1, kappa, bal_acc, y_test, pred
+-
+-def kfold_evaluate(q_encoder, test_subjects, device, BATCH_SIZE):
+-
+-    kfold = KFold(n_splits=5, shuffle=True, random_state=1234)
+-
+-    total_acc, total_f1, total_kappa, total_bal_acc = [], [], [], []
+-    i = 1
+-
+-    for train_idx, test_idx in kfold.split(test_subjects):
+-
+-        test_subjects_train = [test_subjects[i] for i in train_idx]
+-        test_subjects_test = [test_subjects[i] for i in test_idx]
+-        test_subjects_train = [rec for sub in test_subjects_train for rec in sub]
+-        test_subjects_test = [rec for sub in test_subjects_test for rec in sub]
+-
+-        train_loader = DataLoader(TuneDataset(test_subjects_train), batch_size=BATCH_SIZE, shuffle=True, num_workers=4, persistent_workers=True)
+-        test_loader = DataLoader(TuneDataset(test_subjects_test), batch_size=BATCH_SIZE, shuffle= False, num_workers=4, persistent_workers=True)
+-        test_acc, _, test_f1, test_kappa, bal_acc, gt, pd = evaluate(q_encoder, train_loader, test_loader, device)
+-
+-        total_acc.append(test_acc)
+-        total_f1.append(test_f1)
+-        total_kappa.append(test_kappa)
+-        total_bal_acc.append(bal_acc)
+-        
+-        print("+"*50)
+-        print(f"Fold{i} acc: {test_acc}")
+-        print(f"Fold{i} f1: {test_f1}")
+-        print(f"Fold{i} kappa: {test_kappa}")
+-        print(f"Fold{i} bal_acc: {bal_acc}")
+-        print("+"*50)
+-        i+=1 
+-
+-    return np.mean(total_acc), np.mean(total_f1), np.mean(total_kappa), np.mean(total_bal_acc)
+-
+-class TuneDataset(Dataset):
+-    """Dataset for train and test"""
+-
+-    def __init__(self, subjects):
+-        self.subjects = subjects
+-        self._add_subjects()
+-
+-    def __getitem__(self, index):
+-
+-        X = self.X[index]
+-        y =  self.y[index]
+-        return X, y
+-
+-    def __len__(self):
+-        return self.X.shape[0]
+-        
+-    def _add_subjects(self):
+-        self.X = []
+-        self.y = []
+-        for subject in self.subjects:
+-            self.X.append(subject['windows'])
+-            self.y.append(subject['y'])
+-        self.X = np.concatenate(self.X, axis=0)
+-        self.y = np.concatenate(self.y, axis=0)
+-
+-
+-
+-##################################################################################################################################################
+-
+-
+-# Pretrain
+-def Pretext(
+-    q_encoder,
+-    optimizer,
+-    Epoch,
+-    criterion,
+-    pretext_loader,
+-    test_subjects,
+-    wandb,
+-    device, 
+-    SAVE_PATH,
+-    BATCH_SIZE
+-):
+-
+-    step = 0
+-    best_f1 = 0
+-
+-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+-        optimizer, mode="min", factor=0.2, patience=5
+-    )
+-
+-    all_loss, acc_score = [], []
+-    pretext_loss = []
+-
+-    for epoch in range(Epoch):
+-        
+-        print('=========================================================\n')
+-        print("Epoch: {}".format(epoch))
+-        print('=========================================================\n')
+-        
+-        for index, (aug1, aug2, neg) in enumerate(
+-            tqdm(pretext_loader, desc="pretrain")
+-        ):
+-            q_encoder.train()
+-            
+-            aug1 = aug1.float()
+-            aug2 = aug2.float()
+-            neg = neg.float()
+-
+-            aug1, aug2, neg = (
+-                aug1.to(device),
+-                aug2.to(device),
+-                neg.to(device),
+-            )  # (B, 7, 2, 3000)  (B, 7, 2, 3000) (B, 7, 2, 3000)
+-        
+-            anc_features = q_encoder(aug1, proj='top') #(B, 128)
+-            pos_features = q_encoder(aug2, proj='top')  # (B, 128)
+-            neg_features = q_encoder(neg, proj='top')  # (B, 128)
+-           
+-            # backprop
+-            loss = criterion(anc_features, pos_features, neg_features)
+-
+-            # loss back
+-            all_loss.append(loss.item())
+-            pretext_loss.append(loss.cpu().detach().item())
+-
+-            optimizer.zero_grad()
+-            loss.backward()
+-            optimizer.step()  # only update encoder_q
+-
+-            N = 1000
+-            if (step + 1) % N == 0:
+-                scheduler.step(sum(all_loss[-50:]))
+-                lr = optimizer.param_groups[0]["lr"]
+-                wandb.log({"ssl_lr": lr, "Epoch": epoch})
+-            step += 1
+-
+-        wandb.log({"ssl_loss": np.mean(pretext_loss), "Epoch": epoch})
+-
+-        if epoch >= 40 and (epoch) % 5 == 0:
+-
+-            test_acc, test_f1, test_kappa, bal_acc = kfold_evaluate(
+-                q_encoder, test_subjects, device, BATCH_SIZE
+-            )
+-
+-            wandb.log({"Valid Acc": test_acc, "Epoch": epoch})
+-            wandb.log({"Valid F1": test_f1, "Epoch": epoch})
+-            wandb.log({"Valid Kappa": test_kappa, "Epoch": epoch})
+-            wandb.log({"Valid Balanced Acc": bal_acc, "Epoch": epoch})
+-
+-            if test_f1 > best_f1:   
+-                best_f1 = test_f1
+-                torch.save(q_encoder.enc.state_dict(), SAVE_PATH)
+-                wandb.save(SAVE_PATH)
+-                print("save best model on test set with best F1 score")
+diff --git a/simclr/single_epoch_resnet_cont/utils.py b/simclr/single_epoch_resnet_cont/utils.py
+deleted file mode 100644
+index 9fb0740..0000000
+--- a/simclr/single_epoch_resnet_cont/utils.py
++++ /dev/null
+@@ -1,12 +0,0 @@
+-import re
+-
+-def atoi(text):
+-    return int(text) if text.isdigit() else text
+-
+-def natural_keys(text):
+-    '''
+-    alist.sort(key=natural_keys) sorts in human order
+-    http://nedbatchelder.com/blog/200712/human_sorting.html
+-    (See Toothy's implementation in the comments)
+-    '''
+-    return [ atoi(c) for c in re.split(r'(\d+)', text) ]
+\ No newline at end of file

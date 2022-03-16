@@ -1,0 +1,15 @@
+[34m[1mwandb[39m[22m: [33mWARNING[39m Symlinked 0 file into the W&B run directory, call wandb.save again to sync new files.
+pretrain:   0%|                                                                                                                      | 0/89 [00:00<?, ?it/s]
+=========================================================
+Epoch: 0
+pretrain:   0%|                                                                                                                      | 0/89 [00:07<?, ?it/s]
+Traceback (most recent call last):
+  File "single-epoch-resnet-cont.py", line 145, in <module>
+    Pretext(q_encoder, optimizer, n_epochs, criterion, pretext_loader, test_subjects, wb, device, SAVE_PATH, BATCH_SIZE)
+  File "/home2/vivek.talwar/single-epoch/simclr_cont_loss_pos_included/train.py", line 185, in Pretext
+    loss = criterion(anc_features, pos_features, neg_features)
+  File "/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1102, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home2/vivek.talwar/single-epoch/simclr_cont_loss_pos_included/loss.py", line 27, in forward
+    pos_denominator1 = pos_denom.masked_select(mask).view(pos_denom.shape[0],-1).sum(dim=-1) #B,B-1
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument mask in method wrapper__masked_select)
