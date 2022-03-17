@@ -228,6 +228,46 @@ class TuneDataset(BaseConcatDataset):
         return X, y
 
 
+class RelativePositioningDataset(BaseConcatDataset):
+    """BaseConcatDataset with __getitem__ that expects 2 indices and a target."""
+
+    def __init__(self, list_of_ds, epoch_len=7):
+        super().__init__(list_of_ds)
+        self.return_pair = True
+        self.epoch_len = epoch_len
+
+    def __getitem__(self, index):
+
+        pos, neg = index
+        pos_data = []
+        neg_data = []
+
+        assert pos != neg, "pos and neg should not be the same"
+
+        for i in range(-(self.epoch_len // 2), self.epoch_len // 2 + 1):
+            pos_data.append(super().__getitem__(pos + i)[0])
+            neg_data.append(super().__getitem__(neg + i)[0])
+
+        pos_data = np.stack(pos_data, axis=0) # (7, 2, 3000)
+        neg_data = np.stack(neg_data, axis=0) # (7, 2, 3000)
+
+        return pos_data, neg_data
+
+
+class TuneDataset(BaseConcatDataset):
+    """BaseConcatDataset for train and test"""
+
+    def __init__(self, list_of_ds):
+        super().__init__(list_of_ds)
+
+    def __getitem__(self, index):
+
+        X = super().__getitem__(index)[0]
+        y = super().__getitem__(index)[1]
+
+        return X, y
+
+
 class RecordingSampler(Sampler):
     def __init__(self, metadata, random_state=None, epoch_len=7):
 
@@ -252,14 +292,6 @@ class RecordingSampler(Sampler):
     def sample_recording(self):
         """Return a random recording index."""
         return self.rng.choice(self.n_recordings)
-
-    def sample_window(self, rec_ind=None):
-        """Return a specific window."""
-        if rec_ind is None:        
-            for rec_id in self.info.shape[0]:
-                epochs = self.info.iloc[rec_id]["index"]
-                for ep_id in epochs:
-                    yield ep_id, rec_id
             
     def __iter__(self):
         raise NotImplementedError
@@ -292,31 +324,34 @@ class RelativePositioningSampler(RecordingSampler):
         
         """Sample a pair of two windows."""
         # Sample first window
-        win_ind1, rec_ind1 = self.sample_window()
         
-        ts1 = self.metadata.iloc[win_ind1]["i_start_in_trial"]
-        ts = self.info.iloc[rec_ind1]["i_start_in_trial"]
+        for rec_id in range(self.info.shape[0]):
+            epochs = self.info.iloc[rec_id]["index"]
+            for ep_id in epochs:
+                
+                win_ind1, rec_ind1 = ep_id, rec_id
+                ts1 = self.metadata.iloc[win_ind1]["i_start_in_trial"]
+                ts = self.info.iloc[rec_ind1]["i_start_in_trial"]
 
-        epoch_min = self.info.iloc[rec_ind1]["i_start_in_trial"][self.epoch_len // 2]
-        epoch_max = self.info.iloc[rec_ind1]["i_start_in_trial"][-self.epoch_len // 2]
+                epoch_min = self.info.iloc[rec_ind1]["i_start_in_trial"][self.epoch_len // 2]
+                epoch_max = self.info.iloc[rec_ind1]["i_start_in_trial"][-self.epoch_len // 2]
 
-        if self.same_rec_neg:
-            mask = ((ts <= ts1 - self.tau_neg) & (ts >= epoch_min)) | (
-                (ts >= ts1 + self.tau_neg) & (ts <= epoch_max)
-            )
+                if self.same_rec_neg:
+                    mask = ((ts <= ts1 - self.tau_neg) & (ts >= epoch_min)) | (
+                        (ts >= ts1 + self.tau_neg) & (ts <= epoch_max)
+                    )
+                    
+                if sum(mask) == 0:
+                    raise NotImplementedError
+                win_ind2 = self.rng.choice(self.info.iloc[rec_ind1]["index"][mask])
+                yield win_ind1, win_ind2
 
-        if sum(mask) == 0:
-            raise NotImplementedError
-        win_ind2 = self.rng.choice(self.info.iloc[rec_ind1]["index"][mask])
-        
-        return win_ind1, win_ind2
-
-    def __iter__(self):
-        yield self._sample_pair()
-
+    def __iter__(self):  
+        yield from self._sample_pair()
+      
     def __len__(self):
         epoch_len = 0
-        for rec_id in self.info.shape[0]:
+        for rec_id in range(self.info.shape[0]):
             epoch_len += len(self.info.iloc[rec_id]["index"])
         return epoch_len
     
