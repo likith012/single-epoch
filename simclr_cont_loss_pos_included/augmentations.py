@@ -1,20 +1,16 @@
 from scipy.interpolate import interp1d
 from scipy.signal import butter, lfilter
 import numpy as np
+import copy
 
-def denoise_channel(ts, bandpass, signal_freq):
-    """
-    bandpass: (low, high)
-    """
-    nyquist_freq = 0.5 * signal_freq
-    filter_order = 1
 
-    low = bandpass[0] / nyquist_freq
-    high = bandpass[1] / nyquist_freq
-    b, a = butter(filter_order, [low, high], btype="band")
-    ts_out = lfilter(b, a, ts)
-
-    return np.array(ts_out)
+def masking(x):
+    segments = 50 + int(np.random.rand()*(200 - 50))
+    ret = copy.deepcopy(x)
+    for i,k in enumerate(x):
+        points = np.random.randint(0,3000-segments)
+        ret[i,points:points+segments] = 0
+    return ret
 
 
 def noise_channel(ts, mode, degree):
@@ -78,39 +74,6 @@ def add_noise(x, ratio):
 
     return x
 
-
-def remove_noise(x, ratio):
-    """
-    Remove noise from multiple ts
-    Input:
-        x: (n_channel, n_length)
-    Output:
-        x: (n_channel, n_length)
-
-    Three bandpass filtering done independently to each channel
-    sig1 + sig2
-    sig1
-    sig2
-    """
-    bandpass1 = (1, 5)
-    bandpass2 = (30, 49)
-    signal_freq = 100
-
-    for i in range(x.shape[0]):
-        rand = np.random.rand()
-        if rand > 0.75:
-            x[i, :] = denoise_channel(
-                x[i, :], bandpass1, signal_freq
-            ) + denoise_channel(x[i, :], bandpass2, signal_freq)
-        elif rand > 0.5:
-            x[i, :] = denoise_channel(x[i, :], bandpass1, signal_freq)
-        elif rand > 0.25:
-            x[i, :] = denoise_channel(x[i, :], bandpass2, signal_freq)
-        else:
-            pass
-    return x
-
-
 def crop(x):
     n_length = x.shape[1]
     l = np.random.randint(1, n_length - 1)
@@ -124,7 +87,7 @@ def augment(x):
     if t > 0.75:
         x = add_noise(x, ratio=0.5)
     elif t > 0.5:
-        x = remove_noise(x, ratio=0.5)
+        x = masking(x)
     elif t > 0.25:
         x = crop(x)
     else:
