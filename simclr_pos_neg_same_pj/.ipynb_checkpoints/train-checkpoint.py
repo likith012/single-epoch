@@ -83,8 +83,8 @@ def kfold_evaluate(q_encoder, test_subjects, device, BATCH_SIZE):
         test_subjects_train = [rec for sub in test_subjects_train for rec in sub]
         test_subjects_test = [rec for sub in test_subjects_test for rec in sub]
 
-        train_loader = DataLoader(TuneDataset(test_subjects_train), batch_size=BATCH_SIZE, shuffle=True, num_workers=4, persistent_workers=True)
-        test_loader = DataLoader(TuneDataset(test_subjects_test), batch_size=BATCH_SIZE, shuffle= False, num_workers=4, persistent_workers=True)
+        train_loader = DataLoader(TuneDataset(test_subjects_train), batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
+        test_loader = DataLoader(TuneDataset(test_subjects_test), batch_size=BATCH_SIZE, shuffle= False, num_workers=0)
         test_acc, _, test_f1, test_kappa, bal_acc, gt, pd = evaluate(q_encoder, train_loader, test_loader, device)
 
         total_acc.append(test_acc)
@@ -178,8 +178,8 @@ def Pretext(
             )  # (B, 7, 2, 3000)  (B, 7, 2, 3000) (B, 7, 2, 3000)
         
             anc_features = q_encoder(aug1, proj='top') #(B, 128)
-            pos_features = q_encoder(aug2, proj='top')  # (B, 128)
-            neg_features = q_encoder(neg, proj='top')  # (B, 128)
+            pos_features = q_encoder(aug2, proj='bottom')  # (B, 128)
+            neg_features = q_encoder(neg, proj='bottom')  # (B, 128)
            
             # backprop
             loss = criterion(anc_features, pos_features, neg_features)

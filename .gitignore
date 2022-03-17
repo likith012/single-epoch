@@ -1,6 +1,6 @@
 lightning_logs/
 __pycache__/
-wandb/
+*/wandb/
 .vscode/
 /*/__pycache__/
 /*/.ipynb_checkpoints/

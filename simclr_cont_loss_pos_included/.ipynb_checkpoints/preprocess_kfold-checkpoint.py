@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import Sampler
 from sklearn.utils import check_random_state
 
-PATH = '/scratch/sleepkfold/'
+PATH = '/scratch/sleepkfold500single_epoch/'
 DATA_PATH = '/scratch/'
 os.makedirs(PATH, exist_ok=True)
 
@@ -24,7 +24,7 @@ BATCH_SIZE = 1
 POS_MIN = 1
 NEG_MIN = 15
 EPOCH_LEN = 7
-NUM_SAMPLES = 1000
+NUM_SAMPLES = 500
 SUBJECTS = np.arange(83)
 RECORDINGS = [1, 2]
 

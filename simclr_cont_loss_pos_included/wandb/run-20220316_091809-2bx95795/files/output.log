@@ -1267,3 +1267,236 @@ Epoch: 40
 
 
 
+pretrain: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 89/89 [00:54<00:00,  1.62it/s]
+++++++++++++++++++++++++++++++++++++++++++++++++++
+Fold1 acc: 0.6454228421970357
+Fold1 f1: 0.5109103853613522
+Fold1 kappa: 0.5172040513035063
+Fold1 bal_acc: 0.5806266560705685
+++++++++++++++++++++++++++++++++++++++++++++++++++
+/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/sklearn/linear_model/_sag.py:352: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/sklearn/linear_model/_sag.py:352: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+++++++++++++++++++++++++++++++++++++++++++++++++++
+Fold2 acc: 0.6113950201152549
+Fold2 f1: 0.5426023058407794
+Fold2 kappa: 0.4890660709525906
+Fold2 bal_acc: 0.5935004956389922
+++++++++++++++++++++++++++++++++++++++++++++++++++
+/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/sklearn/linear_model/_sag.py:352: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+++++++++++++++++++++++++++++++++++++++++++++++++++
+Fold3 acc: 0.6494333178077938
+Fold3 f1: 0.460850221915015
+Fold3 kappa: 0.505506580566355
+Fold3 bal_acc: 0.5754457607939555
+++++++++++++++++++++++++++++++++++++++++++++++++++
+/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/sklearn/linear_model/_sag.py:352: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+++++++++++++++++++++++++++++++++++++++++++++++++++
+Fold4 acc: 0.6196373286156568
+Fold4 f1: 0.517549324012139
+Fold4 kappa: 0.4987925045716374
+Fold4 bal_acc: 0.5799004383344368
+++++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++++++++++++++
+Fold5 acc: 0.6088008991095357
+Fold5 f1: 0.5014395771765771
+Fold5 kappa: 0.47585926952808355
+Fold5 bal_acc: 0.5468450948389914
+++++++++++++++++++++++++++++++++++++++++++++++++++
+save best model on test set with best F1 score
+=========================================================
+Epoch: 41
+=========================================================
+/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/sklearn/linear_model/_sag.py:352: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pretrain:  98%|██████████████████████████████████████████████████████████████████████████████████████████████████████████▌  | 87/89 [01:53<00:01,  1.30it/s]
+=========================================================
+Epoch: 42
+pretrain: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 89/89 [01:54<00:00,  1.29s/it]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pretrain:  97%|█████████████████████████████████████████████████████████████████████████████████████████████████████████▎   | 86/89 [00:53<00:01,  1.64it/s]
+=========================================================
+Epoch: 43
+pretrain: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 89/89 [00:55<00:00,  1.62it/s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pretrain:  96%|████████████████████████████████████████████████████████████████████████████████████████████████████████     | 85/89 [00:52<00:02,  1.64it/s]
+=========================================================
+Epoch: 44
+pretrain: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 89/89 [00:54<00:00,  1.62it/s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pretrain:  97%|█████████████████████████████████████████████████████████████████████████████████████████████████████████▎   | 86/89 [00:53<00:01,  1.60it/s]
+=========================================================
+Epoch: 45
+pretrain: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 89/89 [00:55<00:00,  1.61it/s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pretrain: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 89/89 [00:54<00:00,  1.62it/s]
+++++++++++++++++++++++++++++++++++++++++++++++++++
+Fold1 acc: 0.6557105492589363
+Fold1 f1: 0.5252465799646189
+Fold1 kappa: 0.5309106820147163
+Fold1 bal_acc: 0.5922456454127532
+++++++++++++++++++++++++++++++++++++++++++++++++++
+/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/sklearn/linear_model/_sag.py:352: ConvergenceWarning: The max_iter was reached which means the coef_ did not converge
+  warnings.warn(
+Traceback (most recent call last):
+  File "single-epoch-resnet-cont.py", line 145, in <module>
+    Pretext(q_encoder, optimizer, n_epochs, criterion, pretext_loader, test_subjects, wb, device, SAVE_PATH, BATCH_SIZE)
+  File "/home2/vivek.talwar/single-epoch/simclr_cont_loss_pos_included/train.py", line 206, in Pretext
+  File "/home2/vivek.talwar/single-epoch/simclr_cont_loss_pos_included/train.py", line 86, in kfold_evaluate
+  File "/home2/vivek.talwar/single-epoch/simclr_cont_loss_pos_included/train.py", line 110, in __init__
+    self.subjects = subjects
+  File "/home2/vivek.talwar/single-epoch/simclr_cont_loss_pos_included/train.py", line 127, in _add_subjects
+    self.y.append(subject['y'])
+  File "<__array_function__ internals>", line 5, in concatenate
+  File "/home2/vivek.talwar/miniconda3/envs/torch/lib/python3.8/site-packages/torch/utils/data/_utils/signal_handling.py", line 66, in handler
+    _error_if_any_worker_fails()
+RuntimeError: DataLoader worker (pid 24027) is killed by signal: Killed.

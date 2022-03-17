@@ -14,7 +14,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 
-PATH = '/scratch/sleepkfold'
+PATH = '/scratch/sleepkfold500single_epoch'
 
 # Params
 SAVE_PATH = "single-epoch-resnet-cont-loss.pth"
@@ -137,7 +137,7 @@ wb = wandb.init(
         notes="single-epoch, symmetric loss, 1000 samples, using same projection heads for neg and pos and no batch norm, original simclr",
         save_code=True,
         entity="sleep-staging",
-        name="single-epoch-contrastive-loss-t-100, same_pos_neg_pj",
+        name="single-epoch-contrastive-loss-t-100-samples-500, same_pos_neg_pj",
     )
 wb.save('multi-epoch/single_epoch_resnet_cont/*.py')
 wb.watch([q_encoder],log='all',log_freq=500)

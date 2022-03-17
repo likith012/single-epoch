@@ -27,7 +27,7 @@ N_DIM = 256
 PROJ_DIM = N_DIM // 2
 EPOCH_LEN = 7
 m = 0.9995
-TEMPERATURE = 10
+TEMPERATURE = 1
 
 ####################################################################################################
 
@@ -145,7 +145,7 @@ wb = wandb.init(
         notes="single-epoch, symmetric loss, 1000 samples, using same projection heads and no batch norm, original simclr",
         save_code=True,
         entity="sleep-staging",
-        name="MOCO , same_pos_anc",
+        name="MOCO t-1, same_pos_anc",
     )
 wb.save('single-epoch/moco/*.py')
 wb.watch([q_encoder],log='all',log_freq=500)
