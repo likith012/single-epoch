@@ -272,9 +272,9 @@ class RecordingSampler(Sampler):
     def __init__(self, metadata, random_state=None, epoch_len=7):
 
         self.metadata = metadata
+        self.epoch_len = epoch_len
         self._init_info()
         self.rng = check_random_state(random_state)
-        self.epoch_len = epoch_len
 
     def _init_info(self):
         keys = ["subject", "recording"]
@@ -319,6 +319,10 @@ class RelativePositioningSampler(RecordingSampler):
         self.epoch_len = epoch_len
         self.n_examples = n_examples
         self.same_rec_neg = same_rec_neg
+        self.info['index'] = self.info['index'].apply(lambda x: x[self.epoch_len // 2 : -(self.epoch_len // 2) ])
+        self.info['i_start_in_trial'] = self.info['i_start_in_trial'].apply(lambda x: x[self.epoch_len // 2 : -(self.epoch_len // 2) ])
+        self.info.iloc[-1]['index'] = self.info.iloc[-1]['index'][:-(7 // 2) - 1]
+        self.info.iloc[-1]['i_start_in_trial'] = self.info.iloc[-1]['i_start_in_trial'][: -(self.epoch_len // 2) - 1]
 
     def _sample_pair(self):
         
@@ -327,10 +331,11 @@ class RelativePositioningSampler(RecordingSampler):
         
         for rec_id in range(self.info.shape[0]):
             epochs = self.info.iloc[rec_id]["index"]
-            for ep_id in epochs:
-                
+            start_trail = self.info.iloc[rec_id]["i_start_in_trial"]
+            for ep_id, trail in zip(epochs, start_trail):
+               
                 win_ind1, rec_ind1 = ep_id, rec_id
-                ts1 = self.metadata.iloc[win_ind1]["i_start_in_trial"]
+                ts1 = trail
                 ts = self.info.iloc[rec_ind1]["i_start_in_trial"]
 
                 epoch_min = self.info.iloc[rec_ind1]["i_start_in_trial"][self.epoch_len // 2]
