@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import Sampler
 from sklearn.utils import check_random_state
 
-PATH = '/scratch/sleepkfold500single_epoch/'
+PATH = '/scratch/sleepkfold_allsamples/'
 DATA_PATH = '/scratch/'
 os.makedirs(PATH, exist_ok=True)
 
@@ -393,7 +393,6 @@ tau_pos, tau_neg = int(sfreq * POS_MIN * 60), int(sfreq * NEG_MIN * 60)
 n_examples_pretext = NUM_SAMPLES * len(splitted["pretext"].datasets)
 
 print(f'Number of pretext subjects: {len(splitted["pretext"].datasets)}')
-print(f'Number of pretext epochs: {n_examples_pretext}')
 
 pretext_sampler = RelativePositioningSampler(
     splitted["pretext"].get_metadata(),
@@ -412,6 +411,7 @@ pretext_loader = DataLoader(
     sampler=pretext_sampler
 )
 
+print(f'Number of pretext epochs: {len(pretext_loader)}')
 
 for i, arr in tqdm(enumerate(pretext_loader), desc = 'pretext'):
     temp_path = os.path.join(PRETEXT_PATH, str(i) + '.npz')
